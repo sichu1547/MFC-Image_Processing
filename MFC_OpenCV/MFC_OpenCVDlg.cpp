@@ -183,7 +183,7 @@ void CMFCOpenCVDlg::OnBnClickedBtnload()
 			imshow("org", m_orgImg);
 			std::string savePath = "C:/Users/dksk5/Pictures/saved_image.jpg"; // Save
 			bool success = cv::imwrite(savePath, m_orgImg);
-			//git test
+			//git testasd
 			if (!PathFileExists(filePath) && m_orgImg.empty())
 				AfxMessageBox(_T("파일이 존재하지 않습니다. 경로를 확인하세요."));
 
