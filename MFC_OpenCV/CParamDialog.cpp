@@ -25,7 +25,8 @@ void CParamDialog::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Text(pDX, IDC_EDIT1, m_strAngle);
-    DDX_Text(pDX, IDC_EDIT1, m_strSize);
+    DDX_Text(pDX, IDC_EDIT1, m_strScale);
+    DDX_Text(pDX, IDC_EDIT1, m_strResize);
 }
 
 void CParamDialog::OnPaint()
@@ -78,7 +79,7 @@ END_MESSAGE_MAP()
 
 void CParamDialog::OnBnClickedBtnCheck()
 {
-    CString strAngle;
-    GetDlgItemText(IDC_EDIT1, strAngle);
+    CString strValue;
+    GetDlgItemText(IDC_EDIT1, strValue);
     OnOK();
 }

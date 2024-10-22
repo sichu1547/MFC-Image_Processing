@@ -103,7 +103,7 @@ BOOL CMFCOpenCVDlg::OnInitDialog()
 	m_comboFunctions.AddString(_T("Filtering"));
 	m_comboFunctions.AddString(_T("Inverse"));
 	m_comboFunctions.AddString(_T("Rotation"));
-
+	m_comboFunctions.AddString(_T("Resize"));
 	// 이 대화 상자의 아이콘을 설정합니다.  응용 프로그램의 주 창이 대화 상자가 아닐 경우에는
 	//  프레임워크가 이 작업을 자동으로 수행합니다.
 	SetIcon(m_hIcon, TRUE);			// 큰 아이콘을 설정합니다.
@@ -189,7 +189,7 @@ void CMFCOpenCVDlg::OnBnClickedBtnload()
 
 			CString strSrc = L"Original Image";
 			m_strBeforeSrcImg = strSrc;
-			m_dBeforeAngle = 0.0;
+			m_dBeforeAngle = 0.0, m_strBeforeScale = "";
 			SetDlgItemText(IDC_STATIC_PATH, fileContent);
 			SetDlgItemText(IDC_STATIC_SRCIMG, strSrc);
 			//m_orgImg.release();
@@ -219,7 +219,7 @@ void CMFCOpenCVDlg::OnCbnSelchangeFuncList()
 {
 
 }
-void CMFCOpenCVDlg::func1(int iKernelW, int iKernelH)
+void CMFCOpenCVDlg::ImageFiltering(int iKernelW, int iKernelH)
 {
 	Mat blurredImage;
 	if (iKernelW % 2 == 0)
@@ -231,7 +231,7 @@ void CMFCOpenCVDlg::func1(int iKernelW, int iKernelH)
 	imshow("Blurred Image", blurredImage);
 	AfxMessageBox(_T("Gaussian Blur"));
 }
-void CMFCOpenCVDlg::func2()
+void CMFCOpenCVDlg::ImageInverse()
 {
 	Mat InverseImg(m_orgImg.rows, m_orgImg.cols, CV_8UC1);
 	__m256i vec255 = _mm256_set1_epi8(255);
@@ -253,7 +253,7 @@ void CMFCOpenCVDlg::func2()
 	imshow("Inverse Image", InverseImg);
 	AfxMessageBox(_T("Inverse"));
 }
-void CMFCOpenCVDlg::func3(Mat& src, double angle)
+void CMFCOpenCVDlg::ImageRotation(Mat& src, double angle)
 {
 	int iWidth = src.cols; 
 	int iHeight = src.rows;
@@ -287,14 +287,14 @@ void CMFCOpenCVDlg::OnBnClickedBtnProc()
 	}
 	else
 	{
-		int nSel = m_comboFunctions.GetCurSel();
+		int iComboIndex = m_comboFunctions.GetCurSel();
 
-		if (nSel != CB_ERR)
+		if (iComboIndex != CB_ERR)
 		{
 			CString selectedText;
-			m_comboFunctions.GetLBText(nSel, selectedText);  // 선택된 텍스트 가져오기
+			m_comboFunctions.GetLBText(iComboIndex, selectedText);  // 선택된 텍스트 가져오기
 
-			if (nSel == 0)
+			if (selectedText == "Filtering")
 			{
 				CParamDialog paramDlg;
 				
@@ -306,17 +306,17 @@ void CMFCOpenCVDlg::OnBnClickedBtnProc()
 					else
 						m_strSrcImg = m_strBeforeSrcImg;
 
-					CString strSize = paramDlg.m_strSize;
+					CString strSize = paramDlg.m_strScale;
 					int iPos = strSize.Find(_T(","));
 					CString strWidth = strSize.Left(iPos);
 					CString strHeight = strSize.Mid(iPos + 1).Trim(); // Trim : 공백 제거
 					int iWidth = _ttoi(strWidth), iHeight = _ttoi(strHeight);
-					func1(iWidth, iHeight);
+					ImageFiltering(iWidth, iHeight);
 				}				
 			}
-			else if (nSel == 1)
+			else if (selectedText == "Inverse")
 			{
-				func2();
+				ImageInverse();
 				CString strChange = L"Inverse Image";
 
 				if (m_strSrcImg != strChange)
@@ -324,7 +324,7 @@ void CMFCOpenCVDlg::OnBnClickedBtnProc()
 				else
 					m_strSrcImg = m_strBeforeSrcImg;
 			}
-			else if (nSel == 2)
+			else if (selectedText == "Rotation")
 			{
 				CParamDialog paramDlg;
 				if (paramDlg.DoModal() == IDOK)
@@ -335,7 +335,33 @@ void CMFCOpenCVDlg::OnBnClickedBtnProc()
 					strChange.Format(L"Rotation Image Angle: %02f", dAngle + m_dBeforeAngle);
 					m_strSrcImg = strChange;
 					m_Angle = dAngle;
-					func3(m_orgImg, dAngle);
+					ImageRotation(m_orgImg, dAngle);
+				}
+			}
+			else if (selectedText == "Resize")
+			{
+				CParamDialog paramDlg;
+				if (paramDlg.DoModal() == IDOK)
+				{
+					CString strScale = paramDlg.m_strScale;
+					CString strChange;
+					double dScale = _ttof(strScale);		
+					if (m_strBeforeScale != "")
+					{
+						CString str = m_strBeforeScale + " -> " + strScale;
+						strChange.Format(L"Resize Image Scale: %s", str);
+						m_strScale = str;
+					}
+						
+					else
+					{
+						strChange.Format(L"Resize Image Scale: %s", strScale);
+						m_strScale = strScale;
+					}
+						
+					m_strSrcImg = strChange;
+					
+					ImageResize(m_orgImg, dScale);
 				}
 			}
 		}
@@ -356,13 +382,24 @@ void CMFCOpenCVDlg::OnBnClickedBtnChange()
 	{
 		m_orgImg = m_ChangeImg;
 		m_dBeforeAngle += m_Angle;
+		m_strBeforeScale = m_strScale;
+		m_strScale = "";
 		m_Angle = 0;
 		SetDlgItemText(IDC_STATIC_SRCIMG, m_strSrcImg);
 		AfxMessageBox(_T("이미지가 변경되었습니다."));
 	}
 
 }
+void CMFCOpenCVDlg::ImageResize(Mat& src, double dScale)
+{
+	Mat dst;
+	resize(src, dst, Size(), dScale, dScale, dScale > 1 ? INTER_LINEAR : INTER_AREA); // 선형: 2x2 주변 픽셀을 사용한 선형 보간, 확대에 적합, Area: 영역 기반 보간으로 축소 시 품질 보증
 
+	m_ChangeImg = dst;
+
+	imshow("Resize", dst);
+	AfxMessageBox(_T("Resize"));
+}
 
 void CMFCOpenCVDlg::OnStnClickedStaticSrcimg()
 {
