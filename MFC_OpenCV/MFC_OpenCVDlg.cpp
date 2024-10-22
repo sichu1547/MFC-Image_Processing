@@ -71,6 +71,7 @@ BEGIN_MESSAGE_MAP(CMFCOpenCVDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_PROC, &CMFCOpenCVDlg::OnBnClickedBtnProc)
 	ON_BN_CLICKED(IDC_BTN_CHANGE, &CMFCOpenCVDlg::OnBnClickedBtnChange)
 	ON_STN_CLICKED(IDC_STATIC_SRCIMG, &CMFCOpenCVDlg::OnStnClickedStaticSrcimg)
+	ON_BN_CLICKED(IDC_BTN_HIST, &CMFCOpenCVDlg::OnBnClickedBtnHist)
 END_MESSAGE_MAP()
 
 
@@ -404,4 +405,40 @@ void CMFCOpenCVDlg::ImageResize(Mat& src, double dScale)
 void CMFCOpenCVDlg::OnStnClickedStaticSrcimg()
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+}
+
+
+void CMFCOpenCVDlg::OnBnClickedBtnHist()
+{
+	int iHistSize = 256;
+	float fRange[] = { 0, 256 };
+	const float* fHistRange = { fRange };
+
+	Mat dst;
+	calcHist(&m_orgImg, 1, 0, Mat(), dst, 1, &iHistSize, &fHistRange);
+
+	int iHist_w = 512; int iHist_h = 400;
+	int bin_w = cvRound((double)iHist_w / iHistSize);
+
+	int iHistArea = 50;
+
+	Mat histImage(iHist_h + iHistArea, iHist_w, CV_8UC1, Scalar(0));
+
+	// 정규화 (시각화를 위해)
+	normalize(dst, dst, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+
+	// 히스토그램 그리기
+	for (int i = 1; i < iHistSize; i++)
+	{
+		line(histImage, Point(bin_w * (i - 1), iHist_h - cvRound(dst.at<float>(i - 1))),
+			Point(bin_w * (i), iHist_h - cvRound(dst.at<float>(i))),
+			Scalar(255), 2, 8, 0);
+	}
+
+	putText(histImage, "0", Point(0, iHist_h + 30), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(255), 1);
+	putText(histImage, "128", Point(iHist_w / 2 - 20, iHist_h + 30), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(255), 1);
+	putText(histImage, "255", Point(iHist_w - 40, iHist_h + 30), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(255), 1);
+
+	imshow("Source image", m_orgImg);
+	imshow("Histogram", histImage);
 }
