@@ -104,7 +104,9 @@ BOOL CMFCOpenCVDlg::OnInitDialog()
 	m_comboFunctions.AddString(_T("Filtering"));
 	m_comboFunctions.AddString(_T("Inverse"));
 	m_comboFunctions.AddString(_T("Rotation"));
-	m_comboFunctions.AddString(_T("Resize"));
+	m_comboFunctions.AddString(_T("Resize")); 
+	m_comboFunctions.AddString(_T("Mirror_TD"));
+	m_comboFunctions.AddString(_T("Mirror_LR"));
 	// 이 대화 상자의 아이콘을 설정합니다.  응용 프로그램의 주 창이 대화 상자가 아닐 경우에는
 	//  프레임워크가 이 작업을 자동으로 수행합니다.
 	SetIcon(m_hIcon, TRUE);			// 큰 아이콘을 설정합니다.
@@ -241,13 +243,14 @@ void CMFCOpenCVDlg::ImageInverse()
 	int iTotalCnt = m_orgImg.total();
 	int iSimdWidth = 32;
 
-	for (int i = 0; i <= iTotalCnt - iSimdWidth; i+= iSimdWidth)
+	for (int i = 0; i <= iTotalCnt - iSimdWidth; i += iSimdWidth)
 	{
 		__m256i srcVec = _mm256_loadu_si256((__m256i*)(srcPtr + i));
 		__m256i invVec = _mm256_sub_epi8(vec255, srcVec);
 		_mm256_storeu_si256((__m256i*)(dstPtr + i), invVec);
 	}
-	for (int i = iTotalCnt - iSimdWidth; i < iTotalCnt; i++) {
+	for (int i = iTotalCnt - iSimdWidth; i < iTotalCnt; i++) 
+	{
 		dstPtr[i] = 255 - srcPtr[i];
 	}
 	m_ChangeImg = InverseImg;
@@ -279,8 +282,57 @@ void CMFCOpenCVDlg::ImageRotation(Mat& src, double angle)
 	imshow("Rotation", dst);
 	AfxMessageBox(_T("Rotation"));
 }
+void CMFCOpenCVDlg::Mirroring(Mat& src, bool bTD)
+{
+	int iWidth = src.cols;
+	int iHeight = src.rows;
+	int iSimdWidth = 32;
 
-void CMFCOpenCVDlg::OnBnClickedBtnProc()
+	Mat dst(iHeight, iWidth, src.type());
+
+	uchar* srcPtr = src.data;
+	uchar* dstPtr = dst.data;
+	if (bTD)
+	{
+		// 행을 기준으로 반전
+		for (int j = 0; j <= iHeight / 2; j++)
+		{
+			uchar* srcTopRow = srcPtr + j * iWidth;                       // 위쪽 행
+			uchar* srcBottomRow = srcPtr + (iHeight - j - 1) * iWidth;    // 아래쪽 행
+			uchar* dstTopRow = dstPtr + j * iWidth;
+			uchar* dstBottomRow = dstPtr + (iHeight - j - 1) * iWidth;
+
+			int i = 0;
+
+			for (; i <= iWidth - iSimdWidth; i += iSimdWidth)
+			{
+				__m256i topRowVec = _mm256_loadu_si256((__m256i*)(srcTopRow + i));
+				__m256i bottomRowVec = _mm256_loadu_si256((__m256i*)(srcBottomRow + i));
+
+				_mm256_storeu_si256((__m256i*)(dstBottomRow + i), topRowVec);
+				_mm256_storeu_si256((__m256i*)(dstTopRow + i), bottomRowVec);
+			}
+			// 나머지(%simd pixel)
+			for (; i < iWidth; i++)
+			{
+				dstTopRow[i] = srcBottomRow[i];
+				dstBottomRow[i] = srcTopRow[i];
+			}
+		}
+		
+		imshow("MirrorUptoDown", dst);
+		AfxMessageBox(_T("MirrorUptoDown"));
+	}
+	else
+	{
+		flip(src, dst, 1); // 0 -> 상하반전
+		imshow("Mirror L->R", dst);
+		AfxMessageBox(_T("Mirror L->R"));
+	}
+
+	m_ChangeImg = dst;
+
+}void CMFCOpenCVDlg::OnBnClickedBtnProc()
 {
 	if (m_orgImg.empty())
 	{
@@ -364,6 +416,20 @@ void CMFCOpenCVDlg::OnBnClickedBtnProc()
 					
 					ImageResize(m_orgImg, dScale);
 				}
+			}
+			else if (selectedText == "Mirror_TD")
+			{
+				Mirroring(m_orgImg, TRUE);
+				CString strChange = L"Top -> Down(Mirror) Image";
+
+				m_strSrcImg = strChange;
+			}
+			else if (selectedText == "Mirror_LR")
+			{
+				Mirroring(m_orgImg, FALSE);
+				CString strChange = L"Left -> Right(Mirror) Image";
+
+				m_strSrcImg = strChange;
 			}
 		}
 		else

@@ -47,6 +47,7 @@ public:
 	void ImageInverse();
 	void ImageRotation(Mat& src, double angle);
 	void ImageResize(Mat& src, double dSize);
+	void Mirroring(Mat& src, bool bTD);
 	bool IsImageFile(const CString& filePath);
 	afx_msg void OnBnClickedBtnProc();
 	CStatic m_picOrg;
