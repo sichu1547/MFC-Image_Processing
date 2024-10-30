@@ -72,6 +72,7 @@ BEGIN_MESSAGE_MAP(CMFCOpenCVDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_CHANGE, &CMFCOpenCVDlg::OnBnClickedBtnChange)
 	ON_STN_CLICKED(IDC_STATIC_SRCIMG, &CMFCOpenCVDlg::OnStnClickedStaticSrcimg)
 	ON_BN_CLICKED(IDC_BTN_HIST, &CMFCOpenCVDlg::OnBnClickedBtnHist)
+	ON_BN_CLICKED(IDC_BTN_SAVE, &CMFCOpenCVDlg::OnBnClickedBtnSave)
 END_MESSAGE_MAP()
 
 
@@ -468,6 +469,7 @@ void CMFCOpenCVDlg::ImageResize(Mat& src, double dScale)
 	AfxMessageBox(_T("Resize"));
 }
 
+
 void CMFCOpenCVDlg::OnStnClickedStaticSrcimg()
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
@@ -507,4 +509,37 @@ void CMFCOpenCVDlg::OnBnClickedBtnHist()
 
 	imshow("Source image", m_orgImg);
 	imshow("Histogram", histImage);
+}
+
+
+void CMFCOpenCVDlg::OnBnClickedBtnSave()
+{
+	CFileDialog saveDlg(FALSE, _T("*.jpg"), _T("SavedImage"),
+		OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY,
+		_T("JPEG Files (*.jpg)|*.jpg|PNG Files (*.png)|*.png|All Files (*.*)|*.*||"),
+		this);
+
+	if (saveDlg.DoModal() == IDOK)
+	{
+		CString strPath = saveDlg.GetPathName();
+
+		string strSavePath = (CT2CA(strPath));
+		replace(strSavePath.begin(), strSavePath.end(), '\\', '/');
+
+		if (m_orgImg.empty())
+		{
+			AfxMessageBox(_T("No Image"));
+		}
+		else
+		{
+			if (imwrite(strSavePath, m_orgImg))
+			{
+				AfxMessageBox(_T("Save Image"));
+			}
+			else
+			{
+				AfxMessageBox(_T("Failed to save"));
+			}
+		}
+	}
 }

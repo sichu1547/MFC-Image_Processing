@@ -57,4 +57,5 @@ public:
 	CString m_strBeforeSrcImg, m_strBeforeScale, m_strScale;
 	double m_dBeforeAngle, m_Angle;
 	afx_msg void OnBnClickedBtnHist();
+	afx_msg void OnBnClickedBtnSave();
 };
