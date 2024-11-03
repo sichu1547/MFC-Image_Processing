@@ -73,6 +73,7 @@ BEGIN_MESSAGE_MAP(CMFCOpenCVDlg, CDialogEx)
 	ON_STN_CLICKED(IDC_STATIC_SRCIMG, &CMFCOpenCVDlg::OnStnClickedStaticSrcimg)
 	ON_BN_CLICKED(IDC_BTN_HIST, &CMFCOpenCVDlg::OnBnClickedBtnHist)
 	ON_BN_CLICKED(IDC_BTN_SAVE, &CMFCOpenCVDlg::OnBnClickedBtnSave)
+	ON_BN_CLICKED(IDC_BTN_DEF, &CMFCOpenCVDlg::OnBnClickedBtnDef)
 END_MESSAGE_MAP()
 
 
@@ -332,8 +333,9 @@ void CMFCOpenCVDlg::Mirroring(Mat& src, bool bTD)
 	}
 
 	m_ChangeImg = dst;
+}
 
-}void CMFCOpenCVDlg::OnBnClickedBtnProc()
+void CMFCOpenCVDlg::OnBnClickedBtnProc()
 {
 	if (m_orgImg.empty())
 	{
@@ -542,4 +544,168 @@ void CMFCOpenCVDlg::OnBnClickedBtnSave()
 			}
 		}
 	}
+}
+
+Mat CMFCOpenCVDlg::AddRandomDefect(Mat src, int iCnt)
+{
+	vector<Rect> vDefPos;
+	Mat dst = src.clone();
+	int iDefCnt = iCnt;
+
+	for (int i = 0; i < iDefCnt; i++)
+	{
+		srand((unsigned int)time(nullptr)); // 랜덤 시드 설정
+
+		BOOL bOverlapping = FALSE;
+		int iPattern = rand() % 3;
+		int iX = rand() % src.cols;
+		int iY = rand() % src.rows;
+		int iW = rand() % 50 + 50;
+		int iH = rand() % 50 + 50;
+		Rect newDefect = Rect(iX, iY, iW, iH);
+		Scalar color(rand() % 256, rand() % 256, rand() % 256);
+
+		if (iDefCnt - iCnt < 3)
+		{
+			for (const auto& defect : vDefPos)
+			{
+				if ((newDefect & defect).area() > 0) { // 중복 영역 확인
+					iDefCnt++;
+					bOverlapping = TRUE;
+				}
+			}
+		}
+
+		if (!bOverlapping)
+		{
+			vDefPos.push_back(newDefect);
+
+			if (iPattern == 0)
+				rectangle(dst, cv::Rect(iX, iY, iW, iH), color, -1);
+			else if (iPattern == 1)
+				circle(dst, cv::Point(iX, iY), iW / 2, color, -1);
+			else
+				line(dst, cv::Point(iX, iY), cv::Point(iX + iW, iY + iH), color, 3);
+		}
+	}
+	imshow("Def Image", dst);
+
+	return dst;
+}
+
+void CMFCOpenCVDlg::OnBnClickedBtnDef()
+{
+
+	CParamDialog paramDlg;
+	if (paramDlg.DoModal() == IDOK)
+	{
+		CString strCnt = paramDlg.m_strRanDefCnt;
+		int iCnt = _ttoi(strCnt);
+		Mat DefImg = AddRandomDefect(m_orgImg, iCnt);
+		//DetectDefect(m_orgImg, DefImg);
+		DetectShiftedDefects(m_orgImg, DefImg, -10, -10);
+	}					
+}
+
+void CMFCOpenCVDlg::DetectDefect(Mat orgImg, Mat defImg)
+{
+	Mat grayDiff, thresh;
+
+	absdiff(orgImg, defImg, grayDiff);
+
+
+	threshold(grayDiff, thresh, 30, 255, THRESH_BINARY);
+	//adaptiveThreshold(grayDiff, thresh, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 11, 2); // 동적 임계값 설정, 조명 또는 결함 위치 변화하는 경우 사용, 주변 픽셀의 평균값 등을 기준으로 임계값 설정
+
+	vector<vector<Point>> contours;
+	findContours(thresh, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+
+	for (const auto& contour : contours)
+	{
+		Rect defectArea = boundingRect(contour);
+		rectangle(defImg, defectArea, Scalar(0, 0, 255), 2);
+	}
+
+	imshow("Result Image", defImg);
+}
+
+void CMFCOpenCVDlg::DetectShiftedDefects(Mat orgImg, Mat defImg, int iShiftX, int iShiftY) 
+{
+	Mat shiftedDefect;
+
+	// 시프트이미지 생성
+	Mat shiftMatrix1 = (Mat_<double>(2, 3) << 1, 0, iShiftX, 0, 1, iShiftY);
+	warpAffine(defImg, shiftedDefect, shiftMatrix1, defImg.size());
+
+	Ptr<ORB> orb = ORB::create();
+	vector<KeyPoint> keypoints1, keypoints2;
+	Mat descriptors1, descriptors2;
+
+	// 특징점과 디스크립터 추출
+	orb->detectAndCompute(orgImg, Mat(), keypoints1, descriptors1);
+	orb->detectAndCompute(shiftedDefect, Mat(), keypoints2, descriptors2);
+
+	// BF 매처로 특징점 매칭
+	BFMatcher matcher(NORM_HAMMING);
+	vector<DMatch> matches;
+	matcher.match(descriptors1, descriptors2, matches);
+
+	// 좋은 매칭점만 추려내기 (거리가 짧은 매칭점)
+	double max_dist = 0; double min_dist = 100;
+	for (int i = 0; i < descriptors1.rows; i++) {
+		double dist = matches[i].distance;
+		if (dist < min_dist) min_dist = dist;
+		if (dist > max_dist) max_dist = dist;
+	}
+
+	vector<DMatch> good_matches;
+	for (int i = 0; i < descriptors1.rows; i++) {
+		if (matches[i].distance <= max(2 * min_dist, 0.02)) {
+			good_matches.push_back(matches[i]);
+		}
+	}
+
+	// 변환 행렬 계산
+	vector<Point2f> pts1, pts2;
+	for (size_t i = 0; i < good_matches.size(); i++) {
+		pts1.push_back(keypoints1[good_matches[i].queryIdx].pt);
+		pts2.push_back(keypoints2[good_matches[i].trainIdx].pt);
+	}
+
+	// 시프트 수치 계산 변환 행렬 추정
+	Mat shiftMatrix = estimateAffinePartial2D(pts1, pts2);
+	shiftMatrix.at<double>(0, 2) = -shiftMatrix.at<double>(0, 2);
+	shiftMatrix.at<double>(1, 2) = -shiftMatrix.at<double>(1, 2);
+
+	Mat alignedDefectImg;
+	warpAffine(shiftedDefect, alignedDefectImg, shiftMatrix, shiftedDefect.size());
+
+	Mat diff;
+	absdiff(orgImg, alignedDefectImg, diff);
+
+	Mat thresh;
+	threshold(diff, thresh, 30, 255, THRESH_BINARY);
+	//adaptiveThreshold(diff, thresh, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 11, 2); //동적 이진화
+
+	vector<vector<Point>> contours;
+	Mat CroppedImage;
+	Rect roi;	
+
+	if (shiftMatrix.at<double>(0, 2) > 0) //시프트로 인한 이미지 손실 구간 자르기
+		roi = Rect(shiftMatrix.at<double>(0, 2), shiftMatrix.at<double>(1, 2), thresh.cols - shiftMatrix.at<double>(0, 2), thresh.rows - shiftMatrix.at<double>(1, 2));
+	else
+		roi = Rect(0, 0, thresh.cols + shiftMatrix.at<double>(0, 2), thresh.rows + shiftMatrix.at<double>(1, 2));
+
+	CroppedImage = thresh(roi);
+	findContours(CroppedImage, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+
+	for (const auto& contour : contours) {		
+		if (contour.size() > 30)
+		{
+			Rect boundingBox = boundingRect(contour);
+			rectangle(shiftedDefect, boundingBox, Scalar(0, 0, 255), 2);
+		}
+	}
+
+	imshow("Result", shiftedDefect);
 }

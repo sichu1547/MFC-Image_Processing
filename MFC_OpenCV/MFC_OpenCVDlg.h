@@ -6,6 +6,8 @@
 #include <string>
 #include <Shlwapi.h>  // PathFileExists 함수 사용을 위해 필요
 #include <immintrin.h> // AVX
+#include <cstdlib>
+#include <ctime> //Random
 #pragma comment(lib, "Shlwapi.lib")  // 링크 설정
 // MFC_OpenCVDlg.h: 헤더 파일
 //
@@ -48,6 +50,9 @@ public:
 	void ImageRotation(Mat& src, double angle);
 	void ImageResize(Mat& src, double dSize);
 	void Mirroring(Mat& src, bool bTD);
+	Mat AddRandomDefect(Mat src, int iCnt);
+	void DetectDefect(Mat orgImg, Mat defImg);
+	void DetectShiftedDefects(Mat orgImg, Mat defImg, int iShiftX, int iShiftY);
 	bool IsImageFile(const CString& filePath);
 	afx_msg void OnBnClickedBtnProc();
 	CStatic m_picOrg;
@@ -58,4 +63,5 @@ public:
 	double m_dBeforeAngle, m_Angle;
 	afx_msg void OnBnClickedBtnHist();
 	afx_msg void OnBnClickedBtnSave();
+	afx_msg void OnBnClickedBtnDef();
 };
