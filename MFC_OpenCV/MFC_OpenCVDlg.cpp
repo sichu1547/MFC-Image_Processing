@@ -553,11 +553,10 @@ Mat CMFCOpenCVDlg::AddRandomDefect(Mat src, int iCnt)
 	vector<Rect> vDefPos;
 	Mat dst = src.clone();
 	int iDefCnt = iCnt;
+	srand((unsigned int)time(nullptr));
 
 	for (int i = 0; i < iDefCnt; i++)
 	{
-		srand((unsigned int)time(nullptr)); // 랜덤 시드 설정
-
 		BOOL bOverlapping = FALSE;
 		int iPattern = rand() % 3;
 		int iX = rand() % src.cols;
