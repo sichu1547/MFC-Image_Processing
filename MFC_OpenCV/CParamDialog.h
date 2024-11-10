@@ -23,6 +23,6 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	CString m_strAngle; // 각도
-	CString m_strScale, m_strResize, m_strRanDefCnt;
+	CString m_strScale, m_strResize, m_strRanDefCnt, m_strShift;
 	afx_msg void OnBnClickedBtnCheck();
 };

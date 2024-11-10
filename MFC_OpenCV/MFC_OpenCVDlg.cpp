@@ -74,6 +74,8 @@ BEGIN_MESSAGE_MAP(CMFCOpenCVDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_HIST, &CMFCOpenCVDlg::OnBnClickedBtnHist)
 	ON_BN_CLICKED(IDC_BTN_SAVE, &CMFCOpenCVDlg::OnBnClickedBtnSave)
 	ON_BN_CLICKED(IDC_BTN_DEF, &CMFCOpenCVDlg::OnBnClickedBtnDef)
+	ON_BN_CLICKED(IDC_BTN_DTT1, &CMFCOpenCVDlg::OnBnClickedBtnDtt1)
+	ON_BN_CLICKED(IDC_BTN_DTTS, &CMFCOpenCVDlg::OnBnClickedBtnDtts)
 END_MESSAGE_MAP()
 
 
@@ -183,16 +185,14 @@ void CMFCOpenCVDlg::OnBnClickedBtnload()
 
 			fileContent = strPath + filePath;						
 			string strp = (CT2CA(filePath));
-			std::replace(strp.begin(), strp.end(), '\\', '/');
+			replace(strp.begin(), strp.end(), '\\', '/');
 			m_orgImg = imread(strp, IMREAD_GRAYSCALE);
 			imshow("org", m_orgImg);
-			std::string savePath = "C:/Users/dksk5/Pictures/saved_image.jpg"; // Save
-			bool success = cv::imwrite(savePath, m_orgImg);
 
 			if (!PathFileExists(filePath) && m_orgImg.empty())
 				AfxMessageBox(_T("파일이 존재하지 않습니다. 경로를 확인하세요."));
 
-			CString strSrc = L"Original Image";
+			CString strSrc = L"SRC Image : Original Image";
 			m_strBeforeSrcImg = strSrc;
 			m_dBeforeAngle = 0.0, m_strBeforeScale = "";
 			SetDlgItemText(IDC_STATIC_PATH, fileContent);
@@ -274,8 +274,8 @@ void CMFCOpenCVDlg::ImageRotation(Mat& src, double angle)
 	Rect2f bbox = RotatedRect(Point2f(), src.size(), angle).boundingRect2f();
 
 	// 4. 회전 행렬에 바운딩 박스 크기에 맞추기 위한 이동 값을 적용
-	rotMatrix.at<double>(0, 2) += bbox.width / 2.0 - center.x;
-	rotMatrix.at<double>(1, 2) += bbox.height / 2.0 - center.y;
+	rotMatrix.ptr<double>(0)[2] += bbox.width / 2.0 - center.x;
+	rotMatrix.ptr<double>(1)[2] += bbox.height / 2.0 - center.y;
 	// 회전 변환 적용
 	warpAffine(src, dst, rotMatrix, bbox.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar(0, 0, 0)); // 이미지 회전, INTER_LINEAR : 선형보간, BORDER_CONSTANT: 빈공간 처리방식(상수), 빈 공간 채울 색상
 
@@ -455,7 +455,9 @@ void CMFCOpenCVDlg::OnBnClickedBtnChange()
 		m_strBeforeScale = m_strScale;
 		m_strScale = "";
 		m_Angle = 0;
-		SetDlgItemText(IDC_STATIC_SRCIMG, m_strSrcImg);
+		CString strText;
+		strText.Format(_T("SRC Image : %s"), m_strSrcImg);
+		SetDlgItemText(IDC_STATIC_SRCIMG, strText);
 		AfxMessageBox(_T("이미지가 변경되었습니다."));
 	}
 
@@ -581,11 +583,11 @@ Mat CMFCOpenCVDlg::AddRandomDefect(Mat src, int iCnt)
 			vDefPos.push_back(newDefect);
 
 			if (iPattern == 0)
-				rectangle(dst, cv::Rect(iX, iY, iW, iH), color, -1);
+				rectangle(dst, Rect(iX, iY, iW, iH), color, -1);
 			else if (iPattern == 1)
-				circle(dst, cv::Point(iX, iY), iW / 2, color, -1);
+				circle(dst, Point(iX, iY), iW / 2, color, -1);
 			else
-				line(dst, cv::Point(iX, iY), cv::Point(iX + iW, iY + iH), color, 3);
+				line(dst, Point(iX, iY), Point(iX + iW, iY + iH), color, 3);
 		}
 	}
 	imshow("Def Image", dst);
@@ -601,9 +603,7 @@ void CMFCOpenCVDlg::OnBnClickedBtnDef()
 	{
 		CString strCnt = paramDlg.m_strRanDefCnt;
 		int iCnt = _ttoi(strCnt);
-		Mat DefImg = AddRandomDefect(m_orgImg, iCnt);
-		//DetectDefect(m_orgImg, DefImg);
-		DetectShiftedDefects(m_orgImg, DefImg, -10, -10);
+		m_DefImg = AddRandomDefect(m_orgImg, iCnt);
 	}					
 }
 
@@ -674,8 +674,8 @@ void CMFCOpenCVDlg::DetectShiftedDefects(Mat orgImg, Mat defImg, int iShiftX, in
 
 	// 시프트 수치 계산 변환 행렬 추정
 	Mat shiftMatrix = estimateAffinePartial2D(pts1, pts2);
-	shiftMatrix.at<double>(0, 2) = -shiftMatrix.at<double>(0, 2);
-	shiftMatrix.at<double>(1, 2) = -shiftMatrix.at<double>(1, 2);
+	shiftMatrix.ptr<double>(0)[2] = -shiftMatrix.ptr<double>(0)[2];
+	shiftMatrix.ptr<double>(1)[2] = -shiftMatrix.ptr<double>(1)[2];
 
 	Mat alignedDefectImg;
 	warpAffine(shiftedDefect, alignedDefectImg, shiftMatrix, shiftedDefect.size());
@@ -691,10 +691,10 @@ void CMFCOpenCVDlg::DetectShiftedDefects(Mat orgImg, Mat defImg, int iShiftX, in
 	Mat CroppedImage;
 	Rect roi;	
 
-	if (shiftMatrix.at<double>(0, 2) > 0) //시프트로 인한 이미지 손실 구간 자르기
-		roi = Rect(shiftMatrix.at<double>(0, 2), shiftMatrix.at<double>(1, 2), thresh.cols - shiftMatrix.at<double>(0, 2), thresh.rows - shiftMatrix.at<double>(1, 2));
+	if (shiftMatrix.ptr<double>(0)[2] > 0) //시프트로 인한 이미지 손실 구간 자르기
+		roi = Rect(shiftMatrix.ptr<double>(0)[2], shiftMatrix.ptr<double>(1)[2], thresh.cols - shiftMatrix.ptr<double>(0)[2], thresh.rows - shiftMatrix.ptr<double>(1)[2]);
 	else
-		roi = Rect(0, 0, thresh.cols + shiftMatrix.at<double>(0, 2), thresh.rows + shiftMatrix.at<double>(1, 2));
+		roi = Rect(0, 0, thresh.cols + shiftMatrix.ptr<double>(0)[2], thresh.rows + shiftMatrix.ptr<double>(1)[2]);
 
 	CroppedImage = thresh(roi);
 	findContours(CroppedImage, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
@@ -708,4 +708,86 @@ void CMFCOpenCVDlg::DetectShiftedDefects(Mat orgImg, Mat defImg, int iShiftX, in
 	}
 
 	imshow("Result", shiftedDefect);
+}
+
+
+void CMFCOpenCVDlg::DetectPatternDefect(const Mat& img1, const Mat& img2)
+{
+	if (img1.empty() || img2.empty()) {
+		AfxMessageBox(_T("유효하지 않은 이미지입니다."));
+		return;
+	}
+
+	Mat gray1 = img1, gray2 = img2;
+
+	// 주파수 도메인 변환
+	Mat dftImg1, dftImg2;
+	gray1.convertTo(gray1, CV_32F);
+	gray2.convertTo(gray2, CV_32F);
+	dft(gray1, dftImg1, DFT_COMPLEX_OUTPUT);
+	dft(gray2, dftImg2, DFT_COMPLEX_OUTPUT);
+
+	// 패턴 강조를 위한 고주파 필터링
+	Mat highFreq1, highFreq2;
+	Mat lowPassMask = getGaussianKernel(dftImg1.rows, 30, CV_32F) * getGaussianKernel(dftImg1.cols, 30, CV_32F).t(); // 저주파 성분 제거
+	Mat complexMask[] = { lowPassMask, lowPassMask }; // 실수, 허수 채널 생성
+	Mat lowPassFilter;
+	merge(complexMask, 2, lowPassFilter);
+
+	multiply(dftImg1, lowPassFilter, highFreq1);  // 필터 적용
+	multiply(dftImg2, lowPassFilter, highFreq2);
+
+	// 역변환
+	Mat filteredImg1, filteredImg2;
+	idft(highFreq1, filteredImg1, DFT_SCALE | DFT_REAL_OUTPUT);
+	idft(highFreq2, filteredImg2, DFT_SCALE | DFT_REAL_OUTPUT);
+	normalize(filteredImg1, filteredImg1, 0, 255, NORM_MINMAX);
+	normalize(filteredImg2, filteredImg2, 0, 255, NORM_MINMAX);
+	filteredImg1.convertTo(filteredImg1, CV_8U);
+	filteredImg2.convertTo(filteredImg2, CV_8U);
+
+	Mat diff;
+	absdiff(filteredImg1, filteredImg2, diff);
+
+	Mat defectMask;
+	threshold(diff, defectMask, 30, 255, THRESH_BINARY);
+
+	Mat result;
+	img1.copyTo(result);
+	vector<std::vector<Point>> contours;
+	findContours(defectMask, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+	for (const auto& contour : contours) {
+		Rect rect = boundingRect(contour);
+		rectangle(result, rect, Scalar(0, 0, 255), 2);  
+	}
+
+	imshow("Org Image", img1);
+	imshow("Filtered Image 1", filteredImg1);
+	imshow("Filtered Image 2", filteredImg2);
+	imshow("Result", result);
+}
+
+void CMFCOpenCVDlg::OnBnClickedBtnDtt1()
+{
+	if(!m_orgImg.empty() && !m_DefImg.empty())
+		DetectPatternDefect(m_orgImg, m_DefImg);
+}
+
+
+void CMFCOpenCVDlg::OnBnClickedBtnDtts()
+{
+	CParamDialog paramDlg;
+
+	if (paramDlg.DoModal() == IDOK)
+	{
+		CString strSize = paramDlg.m_strScale;
+		int iPos = strSize.Find(_T(","));
+		CString strX = strSize.Left(iPos);
+		CString strY = strSize.Mid(iPos + 1).Trim(); // Trim : 공백 제거
+		int iShiftX = _ttoi(strX), iShiftY = _ttoi(strY);
+
+		if (!m_orgImg.empty() && !m_DefImg.empty())
+			DetectShiftedDefects(m_orgImg, m_DefImg, iShiftX, iShiftY);
+
+	}
 }

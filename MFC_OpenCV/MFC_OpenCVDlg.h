@@ -53,6 +53,7 @@ public:
 	Mat AddRandomDefect(Mat src, int iCnt);
 	void DetectDefect(Mat orgImg, Mat defImg);
 	void DetectShiftedDefects(Mat orgImg, Mat defImg, int iShiftX, int iShiftY);
+	void DetectPatternDefect(const Mat& img1, const Mat& img2);
 	bool IsImageFile(const CString& filePath);
 	afx_msg void OnBnClickedBtnProc();
 	CStatic m_picOrg;
@@ -61,7 +62,10 @@ public:
 	CString m_strSrcImg;
 	CString m_strBeforeSrcImg, m_strBeforeScale, m_strScale;
 	double m_dBeforeAngle, m_Angle;
+	Mat m_DefImg;
 	afx_msg void OnBnClickedBtnHist();
 	afx_msg void OnBnClickedBtnSave();
 	afx_msg void OnBnClickedBtnDef();
+	afx_msg void OnBnClickedBtnDtt1();
+	afx_msg void OnBnClickedBtnDtts();
 };

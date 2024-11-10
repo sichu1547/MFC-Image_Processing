@@ -28,6 +28,7 @@ void CParamDialog::DoDataExchange(CDataExchange* pDX)
     DDX_Text(pDX, IDC_EDIT1, m_strScale);
     DDX_Text(pDX, IDC_EDIT1, m_strResize);
     DDX_Text(pDX, IDC_EDIT1, m_strRanDefCnt);
+    DDX_Text(pDX, IDC_EDIT1, m_strShift);
 }
 
 void CParamDialog::OnPaint()
